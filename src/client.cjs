@@ -64,6 +64,24 @@ function centerSourceRange(range,row,host) {
   frame=requestAnimationFrame(settle);
   return cancel;
 }
+function navigationSession(jump){return jump?.sessionId??jump?.anchor?.sourceSessionId;}
+function scrollToLatest(host) {
+  const started=performance.now(),events=['wheel','touchstart','pointerdown','keydown'];let frame,stopped=false,lastMotion=-450;
+  const cancel=()=>{if(stopped)return;stopped=true;cancelAnimationFrame(frame);for(const type of events)host.removeEventListener(type,cancel,true);};
+  for(const type of events)host.addEventListener(type,cancel,{capture:true,passive:true});
+  const settle=()=>{
+    if(stopped)return;
+    const elapsed=performance.now()-started;
+    if(!host.isConnected||elapsed>1500){cancel();return;}
+    if(elapsed>=350&&elapsed-lastMotion>450){
+      const rows=host.querySelectorAll('[data-chat-node-key]');let scroll=rows[rows.length-1]?.parentElement;
+      while(scroll&&(!/(auto|scroll)/.test(getComputedStyle(scroll).overflowY)||scroll.scrollHeight<=scroll.clientHeight))scroll=scroll.parentElement;
+      if(scroll&&scroll.scrollHeight-scroll.clientHeight-scroll.scrollTop>1){scroll.scrollTo({top:scroll.scrollHeight,behavior:'smooth'});lastMotion=elapsed;}
+    }
+    frame=requestAnimationFrame(settle);
+  };
+  frame=requestAnimationFrame(settle);return cancel;
+}
 // Keep the clicked disclosure stationary while native history sizing settles.
 function holdReadingPosition(button) {
   let scroll=button?.parentElement;
@@ -145,6 +163,13 @@ function apply(ctx) {
         patchNative(owner,{draft:{anchor,question:'',createdId:null,modelSelection:Send.selectedModel(ctx.sessions.binding(anchor.sourceSessionId)?.session)},sideId:null,error:null});showNativePane(owner);
       },
       openBranch(id) {if(!nativeView(owner).busy){patchNative(owner,{sideId:id,draft:null,error:null,jump:null});showNativePane(owner);}},
+      navigate(id) {
+        if(nativeView(owner).busy)return;
+        patchNative(owner,{sideId:id===owner?null:id,draft:null,error:null,jump:{kind:'bottom',sessionId:id,nonce:Date.now()}});
+        if(id===owner){
+          if(ctx.sidebarRight.mounted.getSnapshot()===owner&&ctx.sidebarRight.isExpanded()&&ctx.sidebarRight.active()?.kind==='treechat')ctx.sidebarRight.toggleExpanded();
+        }else showNativePane(owner);
+      },
       jumpTo(branch) {
         if(branch.parentId===owner){
           patchNative(owner,{sideId:null,draft:null,jump:{anchor:branch.anchor,nonce:Date.now()}});
@@ -285,6 +310,7 @@ function apply(ctx) {
       if (!jump) return;
       let cancelled = false, timer, frame, stopCenter;
       const host = getHost(); if(!host)return;
+      if(jump.kind==='bottom')return scrollToLatest(host);
       async function reveal() {
         try {
           const binding = ctx.sessions.binding(sessionId);
@@ -345,14 +371,14 @@ function apply(ctx) {
     const mounted=useSyncExternalStore(ctx.sidebarRight.mounted.subscribe,ctx.sidebarRight.mounted.getSnapshot,ctx.sidebarRight.mounted.getSnapshot);
     const revealed=useRef(null);
     useEffect(()=>{
-      if(!view.jump||view.jump.anchor.sourceSessionId!==props.sessionId||mounted!==props.sessionId||revealed.current===view.jump.nonce)return;
+      if(!view.jump||navigationSession(view.jump)!==props.sessionId||mounted!==props.sessionId||revealed.current===view.jump.nonce)return;
       const frame=requestAnimationFrame(()=>{
         revealed.current=view.jump.nonce;
         if(ctx.sidebarRight.mounted.getSnapshot()===props.sessionId&&ctx.sidebarRight.isExpanded()&&ctx.sidebarRight.active()?.kind==='treechat')ctx.sidebarRight.toggleExpanded();
       });
       return()=>cancelAnimationFrame(frame);
     },[view.jump?.nonce,mounted,props.sessionId]);
-    return h(SessionPane,{...props,mode:'main',observeOnly:true,actions:nativeActions(props.sessionId),jump:view.jump?.anchor.sourceSessionId===props.sessionId?view.jump:null});
+    return h(SessionPane,{...props,mode:'main',observeOnly:true,actions:nativeActions(props.sessionId),jump:navigationSession(view.jump)===props.sessionId?view.jump:null});
   }
   function BranchMap({owner,graph,catalog,actions,onMain}) {
     const [zoom,setZoom]=useState(1),[pan,setPan]=useState({x:16,y:16}),viewport=useRef(null),camera=useRef({zoom:1,pan:{x:16,y:16}}),drag=useRef(null);
@@ -437,8 +463,8 @@ function apply(ctx) {
             h('div',{className:'tc-composer-actions'},h(Button,{type:'submit',className:'tc-send','aria-label':draft.createdId?'重试发送':'发送分支消息',title:'发送',disabled:view.busy||!draft.question.trim()},h(Icon,{name:view.busy?'loading':'send',size:20})))))):
       view.sideId?h('section',{className:'tc-pane',style:{visibility:view.treeOpen?'hidden':undefined},'aria-label':'分支对话'},
         header(title(view.sideId,catalog,graph),()=>branch?actions.jumpTo(branch):tab.actions.close()),
-        path.length>1&&h('nav',{className:'tc-breadcrumbs','aria-label':'分支路径'},path.map((id,i)=>h(React.Fragment,{key:id},i>0&&h(Icon,{name:'chevron',size:11}),i===path.length-1?h('span',{className:'tc-current-crumb','aria-current':'page',title:title(id,catalog,graph)},title(id,catalog,graph)):h(Button,{title:title(id,catalog,graph),onClick:()=>id===owner?actions.jumpTo(graph.branches[path[1]]):actions.openBranch(id)},i===0?'主对话':title(id,catalog,graph))))),
-        !held?h('div',{className:'tc-loading'},'加载中…'):held.error?h('div',{role:'alert',className:'tc-error'},held.error):h(props.SessionProvider,{session:held.reference,key:view.sideId},props.renderSlot('treechat.native-session',{mode:'branch',actions,jump:view.jump?.anchor.sourceSessionId===view.sideId?view.jump:null}))):null,
+        path.length>1&&h('nav',{className:'tc-breadcrumbs','aria-label':'分支路径'},path.map((id,i)=>h(React.Fragment,{key:id},i>0&&h(Icon,{name:'chevron',size:11}),i===path.length-1?h('span',{className:'tc-current-crumb','aria-current':'page',title:title(id,catalog,graph)},title(id,catalog,graph)):h(Button,{title:title(id,catalog,graph),onClick:()=>actions.navigate(id)},i===0?'主对话':title(id,catalog,graph))))),
+        !held?h('div',{className:'tc-loading'},'加载中…'):held.error?h('div',{role:'alert',className:'tc-error'},held.error):h(props.SessionProvider,{session:held.reference,key:view.sideId},props.renderSlot('treechat.native-session',{mode:'branch',actions,jump:navigationSession(view.jump)===view.sideId?view.jump:null}))):null,
       (view.treeOpen||(!view.sideId&&!draft))&&h('section',{className:'tc-pane tc-tree-overlay','aria-label':'当前对话的分支'},header('分支树',()=>view.sideId||draft?patchNative(owner,{treeOpen:false}):tab.actions.close(),true),
         h(BranchMap,{owner,graph,catalog,actions,onMain:()=>{ctx.uiWorkspace.openSession(owner);tab.actions.close();}})));
   }

@@ -14,3 +14,5 @@ Return-to-source navigation was checked on a selected phrase inside a long reply
 Nested return: reproduced native embedded-session scroll restoration overriding the source-selection position. A brief, user-cancellable settling period now compensates delayed layout/restoration. Live child-to-parent navigation on an existing nested branch retained the centered selection after loading settled.
 
 Return animation refinement: native restore is allowed to settle briefly before the source scroll begins. All source corrections now use smooth scrolling, with retries spaced apart; instant scroll-position writes were removed from this path. Live nested-return samples showed intermediate positions through the motion, and the final selection remained centered. 29 tests pass.
+
+Breadcrumb navigation now opens the selected ancestor conversation at its latest messages. Live parent-branch and main-conversation breadcrumb navigation both reached bottomGap 0 without source highlighting. The left arrow retained source highlighting and selection centering; the current breadcrumb is noninteractive. Existing 29 tests pass.
