@@ -1,7 +1,7 @@
 {
   "name": "dsh-treechat",
   "version": "0.3.0-dev.8",
-  "description": "Text-anchored, branching conversations for DeepSeek Harness",
+  "description": "Branching discussions that grow as a tree inside DeepSeek Harness",
   "type": "module",
   "main": "index.js",
   "exports": {
