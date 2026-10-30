@@ -1,0 +1,11 @@
+node_modules/
+.runtime/
+*.tgz
+.DS_Store
+
+.env
+.env.*
+*.zip
+dist/
+
+CODEX_HANDOFF.txt
