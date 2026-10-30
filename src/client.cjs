@@ -281,7 +281,7 @@ function apply(ctx) {
               }
               if (startNode && endNode) { const range=document.createRange(); range.setStart(startNode,startOffset); range.setEnd(endNode,endOffset); CSS.highlights.set('treechat-source',new Highlight(range)); }
             } else if (!position) setNotice('已返回来源消息；文字排版发生变化，未自动高亮具体选区。');
-            timer = setTimeout(() => { row.classList.remove('tc-source-flash'); window.CSS?.highlights?.delete('treechat-source'); }, 1200);
+            timer = setTimeout(() => { row.classList.remove('tc-source-flash'); window.CSS?.highlights?.delete('treechat-source'); }, 1800);
           };
           locate();
         } catch(e) { if (!cancelled) setNotice(errorText(e)); }
