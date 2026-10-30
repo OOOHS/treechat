@@ -36,6 +36,19 @@ function EditableBranchTitle({name,busy,onSave}) {
 }
 function messageText(row) { const copy=row.cloneNode(true);copy.querySelectorAll('[data-treechat-markers]').forEach(el=>el.remove());return copy.textContent; }
 function errorText(e) { return e?.rpcError?.message || e?.message || String(e); }
+function centerSourceRange(range,row,host) {
+  if(!range){row.scrollIntoView({block:'center',behavior:'smooth'});return;}
+  let scroll=row.parentElement;
+  while(scroll&&(!/(auto|scroll)/.test(getComputedStyle(scroll).overflowY)||scroll.scrollHeight<=scroll.clientHeight))scroll=scroll.parentElement;
+  const target=range.getBoundingClientRect();
+  if(scroll){
+    const rect=scroll.getBoundingClientRect(),top=Math.max(0,rect.top+scroll.clientTop);
+    let bottom=Math.min(window.innerHeight,rect.top+scroll.clientTop+scroll.clientHeight);
+    const composer=host.querySelector('[data-composer-card]')?.getBoundingClientRect();
+    if(composer&&composer.top>top&&composer.top<bottom)bottom=composer.top-16;
+    scroll.scrollBy({top:(target.top+target.bottom-top-bottom)/2,behavior:'smooth'});
+  }else window.scrollBy({top:(target.top+target.bottom-window.innerHeight)/2,behavior:'smooth'});
+}
 // Keep the clicked disclosure stationary while native history sizing settles.
 function holdReadingPosition(button) {
   let scroll=button?.parentElement;
@@ -255,7 +268,7 @@ function apply(ctx) {
     }, [chat, graph, sessionId, mode, showInherited]);
     useEffect(() => {
       if (!jump) return;
-      let cancelled = false, timer;
+      let cancelled = false, timer, frame;
       const host = getHost(); if(!host)return;
       async function reveal() {
         try {
@@ -267,10 +280,11 @@ function apply(ctx) {
             const row = [...host.querySelectorAll('[data-chat-node-key]')].find(el => el.getAttribute('data-chat-node-key') === jump.anchor.nodeKey && (jump.anchor.part ? el.getAttribute('data-chat-group-part')===jump.anchor.part : el.getAttribute('data-chat-group-part')!=='reasoning'));
             if (!row && attempts++ < 30) { timer = setTimeout(locate, 100); return; }
             if (!row) { setNotice('来源消息暂时无法定位，可以展开较早的历史后重试。'); return; }
-            row.removeAttribute('data-treechat-inherited'); row.scrollIntoView({ block:'center', behavior:'smooth' });
+            row.removeAttribute('data-treechat-inherited');
             row.classList.add('tc-source-flash');
             const position = C.resolveAnchor(messageText(row), jump.anchor);
-            if (position && window.CSS?.highlights && window.Highlight) {
+            let sourceRange=null;
+            if (position) {
               const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT); let node, offset=0, startNode, endNode, startOffset, endOffset;
               while ((node=walker.nextNode())) {
                 if(node.parentElement?.closest('[data-treechat-markers]'))continue;
@@ -279,15 +293,16 @@ function apply(ctx) {
                 if (position.end <= end) { endNode=node; endOffset=position.end-offset; break; }
                 offset=end;
               }
-              if (startNode && endNode) { const range=document.createRange(); range.setStart(startNode,startOffset); range.setEnd(endNode,endOffset); CSS.highlights.set('treechat-source',new Highlight(range)); }
+              if (startNode && endNode) { sourceRange=document.createRange(); sourceRange.setStart(startNode,startOffset); sourceRange.setEnd(endNode,endOffset); if(window.CSS?.highlights&&window.Highlight)CSS.highlights.set('treechat-source',new Highlight(sourceRange)); }
             } else if (!position) setNotice('已返回来源消息；文字排版发生变化，未自动高亮具体选区。');
+            frame=requestAnimationFrame(()=>{frame=requestAnimationFrame(()=>{if(!cancelled)centerSourceRange(sourceRange,row,host);});});
             timer = setTimeout(() => { row.classList.remove('tc-source-flash'); window.CSS?.highlights?.delete('treechat-source'); }, 1800);
           };
           locate();
         } catch(e) { if (!cancelled) setNotice(errorText(e)); }
       }
       setShowInherited(true); reveal();
-      return () => { cancelled=true; clearTimeout(timer); host?.querySelectorAll('.tc-source-flash').forEach(el=>el.classList.remove('tc-source-flash')); window.CSS?.highlights?.delete('treechat-source'); };
+      return () => { cancelled=true; clearTimeout(timer);cancelAnimationFrame(frame); host?.querySelectorAll('.tc-source-flash').forEach(el=>el.classList.remove('tc-source-flash')); window.CSS?.highlights?.delete('treechat-source'); };
     }, [jump?.nonce, sessionId]);
     // TreeChat also supports ungrouped chat sessions. The native hero requires a
     // Workspace chip and disables its composer without one; use the regular

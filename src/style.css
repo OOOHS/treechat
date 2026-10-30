@@ -53,7 +53,7 @@
 .tc-notice{font-size:12px;padding:6px 14px;background:var(--tc-soft);display:flex;align-items:center;justify-content:space-between}
 .tc-native-notice{position:absolute;top:100%;right:12px;z-index:60;max-width:min(400px,80vw);padding:10px 12px;background:var(--tc-bg);box-shadow:0 4px 18px #0002;border-radius:10px;font-size:12px;display:flex;align-items:center;gap:8px}
 .tc-source-flash{outline:2px solid color-mix(in srgb,var(--tc-blue,#4d6bfe) 30%,transparent);outline-offset:5px;border-radius:6px;animation:tc-source-return 1.8s ease-out forwards}
-@keyframes tc-source-return{0%,30%{outline-color:color-mix(in srgb,var(--tc-blue,#4d6bfe) 30%,transparent)}100%{outline-color:transparent}}
+@keyframes tc-source-return{0%,75%{outline-color:color-mix(in srgb,var(--tc-blue,#4d6bfe) 30%,transparent)}100%{outline-color:transparent}}
 @media(prefers-reduced-motion:reduce){.tc-source-flash{animation:none}}
 ::highlight(treechat-source){background:#dbe7ff;color:#1a3279}
 .tc-spinner{animation:tc-spin .8s linear infinite}
