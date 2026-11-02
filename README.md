@@ -36,9 +36,11 @@
 
 ## 安装
 
-在源码目录运行：
+获取源码并构建：
 
 ```sh
+git clone https://github.com/OOOHS/dsh-treechat.git
+cd dsh-treechat
 npm run build
 npm test
 ```
